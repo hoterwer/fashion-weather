@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Стилист по погоде</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 16px; background: #f5f7fa; color: #1a1d20; }
+      h1 { margin: 0 0 8px; font-size: 22px; }
+      h2 { margin: 0 0 8px; font-size: 18px; }
+      p { margin: 4px 0; color: #4a5568; }
+      .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+      button { background: #2563eb; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+      button:disabled { background: #94a3b8; }
+      label { display: block; margin-top: 12px; font-weight: 500; }
+      select, input[type="range"], input[type="text"] { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; box-sizing: border-box; }
+      .outfit { font-weight: 500; margin: 12px 0; padding: 12px; background: #f8fafc; border-radius: 8px; }
+      .temp { color: #ef4444; font-weight: 700; }
+      .error { color: #dc2626; }
+      .category-title { font-weight: 700; margin: 16px 0 8px; font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+      .clothing-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+      .clothing-item { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; background: #fff; }
+      .clothing-item.selected { border-color: #2563eb; background: #eff6ff; }
+      .clothing-item .name { font-weight: 600; font-size: 14px; }
+      .clothing-item .colors { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+      .color-dot { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid #e2e8f0; transition: all 0.15s; }
+      .color-dot.active { border-color: #1a1d20; transform: scale(1.15); }
+      .color-wrap { display: flex; flex-direction: column; align-items: center; }
+      .hint { font-size: 13px; color: #64748b; margin: 8px 0 0; }
+      .badge { display: inline-block; background: #2563eb; color: #fff; border-radius: 12px; padding: 2px 8px; font-size: 11px; margin-left: 4px; }
+      .look-img { width: 100%; border-radius: 10px; margin-top: 10px; display: block; }
+      .look-loading { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #64748b; font-size: 14px; }
+      .spinner { width: 18px; height: 18px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .look-error { color: #dc2626; font-size: 13px; margin-top: 8px; }
+      .look-prompt-toggle { font-size: 12px; color: #64748b; cursor: pointer; margin-top: 8px; text-decoration: underline; }
+      .look-prompt-box { background: #f1f5f9; padding: 8px; border-radius: 6px; font-size: 12px; font-family: monospace; margin-top: 6px; word-break: break-word; display: none; }
+      .look-prompt-box.visible { display: block; }
+      .look-btn { background: #7c3aed; font-size: 14px; padding: 10px 16px; margin-top: 10px; }
+      .look-btn:hover { background: #6d28d9; }
+      .regen-btn { background: #7c3aed; font-size: 12px; padding: 6px 12px; margin-top: 8px; }
+      .regen-btn:hover { background: #6d28d9; }
+      .gender-btns { display: flex; gap: 12px; margin-top: 8px; }
+      .gender-btn { flex: 1; padding: 14px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; background: #fff; text-align: center; font-weight: 600; font-size: 15px; transition: all 0.15s; }
+      .gender-btn.active { border-color: #2563eb; background: #eff6ff; color: #2563eb; }
+    </style>
+  </head>
+  <body>
+    <h1>Стилист по погоде</h1>
+    <p>3 образа по погоде и гардеробу — картинка генерируется по кнопке.</p>
+
+    <div id="step-gender" class="card">
+      <p style="font-weight: 600; margin-bottom: 4px;">Для кого подбираем образ?</p>
+      <div class="gender-btns">
+        <div class="gender-btn" id="gender-male">👨 Мужской</div>
+        <div class="gender-btn" id="gender-female">👩 Женский</div>
+      </div>
+      <button id="btn-gender-next" style="margin-top: 20px;" disabled>Далее →</button>
+    </div>
+
+    <div id="step-location" class="card" style="display:none;">
+      <p>Определим погоду. Можно автоматически или ввести город вручную.</p>
+      <button id="btn-geo">📍 Определить автоматически</button>
+      <div style="margin: 16px 0; text-align: center; color: #94a3b8; font-size: 13px;">— или —</div>
+      <label>Введи город (например, Москва):</label>
+      <input type="text" id="city-input" placeholder="Город" />
+      <button id="btn-city" style="margin-top:12px;">Найти погоду</button>
+    </div>
+
+    <div id="step-wardrobe" class="card" style="display:none;">
+      <h2>Твой гардероб</h2>
+      <p class="hint">Отметь вещи, которые у тебя есть, и выбери цвета. Можно несколько цветов для одной вещи.</p>
+      <div id="wardrobe-list"></div>
+      <button id="btn-wardrobe-next" style="margin-top:20px;">Далее →</button>
+    </div>
+
+    <div id="step-plan" class="card" style="display:none;">
+      <label>Твои планы на день:</label>
+      <select id="purpose">
+        <option value="дом">Дом / удалённая работа</option>
+        <option value="учёба">Учёба / офис</option>
+        <option value="прогулка">Прогулка / встреча</option>
+        <option value="свидание">Свидание / выход</option>
+        <option value="спорт">Спорт / тренировка</option>
+      </select>
+      <label style="margin-top:16px;">Как ты обычно одеваешься?</label>
+      <input type="range" id="layers" min="0" max="2" step="1" value="1" />
+      <div style="display:flex; justify-content:space-between; color:#64748b;">
+        <span>Минимально</span><span>Обычно</span><span>Тепло</span>
+      </div>
+      <button id="btn-generate" style="margin-top:20px;">Получить образы</button>
+    </div>
+
+    <div id="step-result" class="card" style="display:none;">
+      <h2 id="result-city">Город</h2>
+      <p class="temp" id="result-temp">—°C</p>
+      <p id="result-desc">Описание погоды</p>
+      <hr style="border:0; border-top:1px solid #e2e8f0; margin:12px 0;" />
+      <div id="outfits"></div>
+      <button id="btn-refresh" style="margin-top:12px;">Ещё варианты</button>
+      <button id="btn-back-wardrobe" style="margin-top:8px; background:#64748b;">← Изменить гардероб</button>
+    </div>
+
+    <script>
+      const API_KEY = 'cf529515cd2f060ee5674f0e9b5509b9';
+      let selectedGender = null;
+      let lat, lon;
+
+      const COLORS = [
+        { name: 'чёрный', hex: '#1a1a1a' }, { name: 'белый', hex: '#f5f5f5' },
+        { name: 'серый', hex: '#9ca3af' }, { name: 'тёмно-серый', hex: '#4b5563' },
+        { name: 'синий', hex: '#1d4ed8' }, { name: 'голубой', hex: '#60a5fa' },
+        { name: 'тёмно-синий', hex: '#1e3a5f' }, { name: 'зелёный', hex: '#22c55e' },
+        { name: 'хаки', hex: '#84cc16' }, { name: 'оливковый', hex: '#556b2f' },
+        { name: 'красный', hex: '#ef4444' }, { name: 'бордовый', hex: '#991b1b' },
+        { name: 'оранжевый', hex: '#f97316' }, { name: 'жёлтый', hex: '#facc15' },
+        { name: 'розовый', hex: '#f9a8d4' }, { name: 'коричневый', hex: '#92400e' },
+        { name: 'бежевый', hex: '#d2b48c' }, { name: 'фиолетовый', hex: '#8b5cf6' },
+        { name: 'сиреневый', hex: '#c4b5fd' },
+      ];
+
+      const FEMALE_ONLY = new Set(['Топ','Блузка','Юбка','Платье','Леггинсы','Туфли','Ботильоны','Сапоги']);
+
+      const CLOTHING_CATEGORIES = [
+        { title: 'Футболки и топы', items: ['Футболка','Лонгслив','Поло','Топ','Майка'] },
+        { title: 'Рубашки и блузы', items: ['Рубашка','Блузка','Рубашка с коротким рукавом'] },
+        { title: 'Тёплый верх', items: ['Свитер','Худи','Водолазка','Свитшот','Кардиган','Джемпер'] },
+        { title: 'Низ', items: ['Джинсы','Чиносы','Брюки','Слаксы','Шорты','Юбка','Платье','Спортивные штаны','Леггинсы','Джоггеры'] },
+        { title: 'Верхняя одежда', items: ['Куртка','Пальто','Тренч','Ветровка','Парка','Плащ','Жилетка','Пиджак','Бомбер','Дублёнка'] },
+        { title: 'Обувь', items: ['Кроссовки','Кеды','Ботинки','Сандалии','Лоферы','Туфли','Сапоги','Ботильоны','Эспадрильи'] },
+        { title: 'Аксессуары', items: ['Шапка','Шарф','Перчатки','Кепка','Очки','Сумка','Ремень','Бини','Снуд'] }
+      ];
+
+      let wardrobe = {};
+
+      function isItemForGender(itemName) {
+        if (selectedGender === 'male' && FEMALE_ONLY.has(itemName)) return false;
+        return true;
+      }
+
+      // --- ВЫБОР ПОЛА ---
+      document.getElementById('gender-male').addEventListener('click', () => {
+        selectedGender = 'male';
+        document.getElementById('gender-male').classList.add('active');
+        document.getElementById('gender-female').classList.remove('active');
+        document.getElementById('btn-gender-next').disabled = false;
+      });
+      document.getElementById('gender-female').addEventListener('click', () => {
+        selectedGender = 'female';
+        document.getElementById('gender-female').classList.add('active');
+        document.getElementById('gender-male').classList.remove('active');
+        document.getElementById('btn-gender-next').disabled = false;
+      });
+      document.getElementById('btn-gender-next').addEventListener('click', () => {
+        wardrobe = {};
+        document.getElementById('step-gender').style.display = 'none';
+        document.getElementById('step-location').style.display = 'block';
+      });
+
+      // --- ГАРДЕРОБ ---
+      function renderWardrobe() {
+        const container = document.getElementById('wardrobe-list');
+        container.innerHTML = '';
+        CLOTHING_CATEGORIES.forEach(cat => {
+          const visibleItems = cat.items.filter(isItemForGender);
+          if (visibleItems.length === 0) return;
+          const catTitle = document.createElement('div');
+          catTitle.className = 'category-title';
+          catTitle.textContent = cat.title;
+          container.appendChild(catTitle);
+          const grid = document.createElement('div');
+          grid.className = 'clothing-grid';
+          visibleItems.forEach(itemName => {
+            const item = document.createElement('div');
+            item.className = 'clothing-item';
+            if (wardrobe[itemName] && wardrobe[itemName].length > 0) item.classList.add('selected');
+            const nameEl = document.createElement('div');
+            nameEl.className = 'name';
+            nameEl.textContent = itemName;
+            const selectedColors = wardrobe[itemName] || [];
+            if (selectedColors.length > 0) {
+              const badge = document.createElement('span');
+              badge.className = 'badge';
+              badge.textContent = selectedColors.length;
+              nameEl.appendChild(badge);
+            }
+            item.appendChild(nameEl);
+            const colorsWrap = document.createElement('div');
+            colorsWrap.className = 'colors';
+            COLORS.forEach(color => {
+              const colorWrap = document.createElement('div');
+              colorWrap.className = 'color-wrap';
+              const dot = document.createElement('div');
+              dot.className = 'color-dot';
+              dot.style.background = color.hex;
+              if (selectedColors.includes(color.name)) dot.classList.add('active');
+              dot.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!wardrobe[itemName]) wardrobe[itemName] = [];
+                const idx = wardrobe[itemName].indexOf(color.name);
+                if (idx > -1) {
+                  wardrobe[itemName].splice(idx, 1);
+                  dot.classList.remove('active');
+                  if (wardrobe[itemName].length === 0) item.classList.remove('selected');
+                } else {
+                  wardrobe[itemName].push(color.name);
+                  dot.classList.add('active');
+                  item.classList.add('selected');
+                }
+                const existingBadge = nameEl.querySelector('.badge');
+                if (wardrobe[itemName].length > 0) {
+                  if (existingBadge) { existingBadge.textContent = wardrobe[itemName].length; }
+                  else { const b = document.createElement('span'); b.className = 'badge'; b.textContent = wardrobe[itemName].length; nameEl.appendChild(b); }
+                } else if (existingBadge) { existingBadge.remove(); }
+              });
+              colorWrap.appendChild(dot);
+              colorsWrap.appendChild(colorWrap);
+            });
+            item.appendChild(colorsWrap);
+            grid.appendChild(item);
+          });
+          container.appendChild(grid);
+        });
+      }
+
+      // --- ГЕОЛОКАЦИЯ ---
+      document.getElementById('btn-geo').addEventListener('click', () => {
+        const btn = document.getElementById('btn-geo');
+        btn.disabled = true; btn.textContent = 'Определяем…';
+        if (!navigator.geolocation) { showError('Геолокация не поддерживается.'); btn.disabled = false; btn.textContent = '📍 Определить автоматически'; return; }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { lat = pos.coords.latitude; lon = pos.coords.longitude; fetchWeatherByCoords(lat, lon); },
+          () => { showError('Введите город вручную ниже 👇'); btn.disabled = false; btn.textContent = '📍 Определить автоматически'; },
+          { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }
+        );
+      });
+      document.getElementById('btn-city').addEventListener('click', () => {
+        const city = document.getElementById('city-input').value.trim();
+        if (!city) { showError('Введите город.'); return; }
+        fetchWeatherByCity(city);
+      });
+      function showError(msg) {
+        const existing = document.querySelector('#step-location .error');
+        if (existing) existing.remove();
+        const p = document.createElement('p');
+        p.className = 'error'; p.textContent = msg;
+        document.getElementById('step-location').appendChild(p);
+      }
+      async function fetchWeatherByCoords(lat, lon) {
+        const url = 'https://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&units=metric&lang=ru&appid=' + API_KEY;
+        try { const res = await fetch(url); if (!res.ok) throw new Error('err'); const d = await res.json(); showWardrobe(d); }
+        catch (e) { showError('Не удалось загрузить погоду.'); }
+      }
+      async function fetchWeatherByCity(cityName) {
+        const url = 'https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent(cityName) + '&units=metric&lang=ru&appid=' + API_KEY;
+        try { const res = await fetch(url); if (!res.ok) { const d = await res.json(); throw new Error(d.message || 'Город не найден'); } const d = await res.json(); showWardrobe(d); }
+        catch (e) { showError(e.message || 'Не удалось загрузить погоду.'); }
+      }
+      function showWardrobe(data) {
+        window.currentWeather = { temp: Math.round(data.main.temp), desc: data.weather[0].description, city: data.name, wind: data.wind.speed, rain: (data.rain && data.rain['1h']) || 0 };
+        document.getElementById('step-location').style.display = 'none';
+        document.getElementById('step-wardrobe').style.display = 'block';
+        renderWardrobe();
+      }
+      document.getElementById('btn-wardrobe-next').addEventListener('click', () => { document.getElementById('step-wardrobe').style.display = 'none'; document.getElementById('step-plan').style.display = 'block'; });
+      document.getElementById('btn-generate').addEventListener('click', generateOutfits);
+      document.getElementById('btn-refresh').addEventListener('click', generateOutfits);
+      document.getElementById('btn-back-wardrobe').addEventListener('click', () => { document.getElementById('step-result').style.display = 'none'; document.getElementById('step-wardrobe').style.display = 'block'; renderWardrobe(); });
+
+      // --- ГЕНЕРАЦИЯ КАРТИНКИ ЧЕРЕЗ POLLINATIONS (ПО КНОПКЕ) ---
+      function generateLookImage(promptText, container, onDone) {
+        container.innerHTML = '<div class="look-loading"><div class="spinner"></div><span>Рисую образ…</span></div>';
+        const seed = Math.floor(Math.random() * 1000000);
+        const pollUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(promptText) +
+          '?width=1024&height=1400&seed=' + seed + '&nologo=true&model=flux&enhance=true';
+        const img = new Image();
+        img.onload = () => {
+          container.innerHTML = '';
+          img.className = 'look-img';
+          container.appendChild(img);
+          if (onDone) onDone();
+        };
+        img.onerror = () => {
+          const seed2 = Math.floor(Math.random() * 1000000);
+          const pollUrl2 = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(promptText) +
+            '?width=768&height=1024&seed=' + seed2 + '&nologo=true&model=flux';
+          container.innerHTML = '<div class="look-loading"><div class="spinner"></div><span>Пробую ещё раз…</span></div>';
+          const img2 = new Image();
+          img2.onload = () => { container.innerHTML = ''; img2.className = 'look-img'; container.appendChild(img2); if (onDone) onDone(); };
+          img2.onerror = () => { container.innerHTML = '<div class="look-error">Картинка не получилась. Нажмите «🔄» ниже.</div>'; if (onDone) onDone(); };
+          img2.src = pollUrl2;
+        };
+        img.src = pollUrl;
+      }
+
+      function generateOutfits() {
+        const purpose = document.getElementById('purpose').value;
+        const layers = parseInt(document.getElementById('layers').value, 10);
+        const w = window.currentWeather;
+        const outfits = [];
+        for (let i = 0; i < 3; i++) { outfits.push(makeOutfit(w.temp, w.wind, w.rain, purpose, layers, i)); }
+        document.getElementById('result-city').textContent = w.city;
+        document.getElementById('result-temp').textContent = w.temp + '°C';
+        document.getElementById('result-desc').textContent = capitalizeFirst(w.desc);
+        const container = document.getElementById('outfits');
+        container.innerHTML = '';
+        outfits.forEach((outfit, idx) => {
+          const div = document.createElement('div');
+          div.className = 'outfit';
+          const textDiv = document.createElement('div');
+          textDiv.innerHTML = '<strong>Вариант ' + (idx + 1) + ':</strong> ' + outfit.text;
+          div.appendChild(textDiv);
+
+          // Кнопка генерации (НЕ автоматическая!)
+          const lookBtn = document.createElement('button');
+          lookBtn.className = 'look-btn';
+          lookBtn.textContent = '🎨 Показать образ';
+          div.appendChild(lookBtn);
+
+          const lookContainer = document.createElement('div');
+          lookContainer.style.marginTop = '10px';
+          div.appendChild(lookContainer);
+
+          const regenBtn = document.createElement('button');
+          regenBtn.className = 'regen-btn';
+          regenBtn.textContent = '🔄 Другой вариант';
+          regenBtn.style.display = 'none';
+          div.appendChild(regenBtn);
+
+          const promptToggle = document.createElement('div');
+          promptToggle.className = 'look-prompt-toggle';
+          promptToggle.textContent = 'Показать промпт';
+          div.appendChild(promptToggle);
+          const promptBox = document.createElement('div');
+          promptBox.className = 'look-prompt-box';
+          promptBox.textContent = outfit.prompt;
+          div.appendChild(promptBox);
+          promptToggle.addEventListener('click', () => { promptBox.classList.toggle('visible'); promptToggle.textContent = promptBox.classList.contains('visible') ? 'Скрыть промпт' : 'Показать промпт'; });
+
+          // Генерация только по клику
+          lookBtn.addEventListener('click', () => {
+            lookBtn.style.display = 'none';
+            generateLookImage(outfit.prompt, lookContainer, () => { regenBtn.style.display = 'inline-block'; });
+          });
+          regenBtn.addEventListener('click', () => {
+            regenBtn.style.display = 'none';
+            generateLookImage(outfit.prompt, lookContainer, () => { regenBtn.style.display = 'inline-block'; });
+          });
+
+          container.appendChild(div);
+        });
+        document.getElementById('step-plan').style.display = 'none';
+        document.getElementById('step-result').style.display = 'block';
+      }
+
+      function makeOutfit(temp, wind, rain, purpose, layers, variant) {
+        const layerBonus = (layers === 0 ? -1 : (layers === 2 ? 1 : 0));
+        const feelsLike = temp - (wind * 0.5) - (rain > 0 ? 2 : 0) + layerBonus;
+        let tops, bottoms, outers, shoes, accessories;
+        if (feelsLike < 5) {
+          tops = ['Свитер','Худи','Водолазка','Свитшот','Джемпер'];
+          bottoms = ['Джинсы','Брюки','Слаксы'];
+          outers = ['Пальто','Парка','Куртка','Дублёнка'];
+          shoes = ['Ботинки','Сапоги','Ботильоны'];
+          accessories = ['Шапка','Шарф','Перчатки','Снуд','Бини'];
+        } else if (feelsLike < 15) {
+          tops = ['Свитер','Худи','Водолазка','Лонгслив','Джемпер','Рубашка'];
+          bottoms = ['Джинсы','Чиносы','Брюки','Слаксы','Джоггеры'];
+          outers = ['Куртка','Пальто','Тренч','Бомбер','Жилетка'];
+          shoes = ['Кроссовки','Ботинки','Лоферы','Ботильоны'];
+          accessories = ['Шарф','Шапка','Кепка','Снуд'];
+        } else if (feelsLike < 22) {
+          tops = ['Футболка','Лонгслив','Поло','Рубашка','Блузка','Свитшот'];
+          bottoms = ['Джинсы','Чиносы','Брюки','Юбка','Слаксы'];
+          outers = ['Ветровка','Кардиган','Тренч','Жилетка','Бомбер'];
+          shoes = ['Кроссовки','Кеды','Лоферы','Эспадрильи'];
+          accessories = ['Кепка','Очки','Сумка'];
+        } else {
+          tops = ['Футболка','Топ','Майка','Рубашка с коротким рукавом','Поло','Блузка'];
+          bottoms = ['Шорты','Юбка','Платье','Джинсы','Чиносы'];
+          outers = [];
+          shoes = ['Сандалии','Кеды','Кроссовки','Эспадрильи'];
+          accessories = ['Очки','Сумка','Ремень'];
+        }
+        if (purpose === 'дом') {
+          outers = []; accessories = [];
+          if (feelsLike < 15) bottoms = ['Спортивные штаны','Леггинсы','Джоггеры'];
+          tops = ['Футболка','Лонгслив','Свитшот','Топ'];
+        } else if (purpose === 'спорт') {
+          tops = ['Футболка','Лонгслив','Майка','Топ'];
+          bottoms = ['Спортивные штаны','Леггинсы','Джоггеры','Шорты'];
+          outers = []; accessories = ['Кепка','Очки','Сумка'];
+          shoes = ['Кроссовки','Кеды'];
+        } else if (purpose === 'свидание' && feelsLike >= 15) {
+          if (selectedGender === 'female') {
+            tops = ['Блузка','Рубашка','Поло','Топ'];
+            bottoms = ['Юбка','Платье','Слаксы','Чиносы'];
+            shoes = ['Туфли','Лоферы','Кеды'];
+          } else {
+            tops = ['Рубашка','Поло','Лонгслив'];
+            bottoms = ['Слаксы','Чиносы','Джинсы'];
+            shoes = ['Лоферы','Кеды','Кроссовки'];
+          }
+        }
+        [tops, bottoms, outers, shoes, accessories].forEach(arr => {
+          for (let i = arr.length - 1; i >= 0; i--) { if (!isItemForGender(arr[i])) arr.splice(i, 1); }
+        });
+        function pickFromCategory(category) {
+          const available = category.filter(item => wardrobe[item] && wardrobe[item].length > 0);
+          if (available.length === 0) return null;
+          const idx = (variant + Math.floor(Math.random() * available.length)) % available.length;
+          const itemName = available[idx];
+          const colors = wardrobe[itemName];
+          const colorCount = Math.min(colors.length, variant === 0 ? 1 : 2);
+          const pickedColors = []; const usedIndices = new Set();
+          while (pickedColors.length < colorCount && usedIndices.size < colors.length) {
+            const ci = Math.floor(Math.random() * colors.length);
+            if (!usedIndices.has(ci)) { usedIndices.add(ci); pickedColors.push(colors[ci]); }
+          }
+          return { name: itemName, colors: pickedColors };
+        }
+        const top = pickFromCategory(tops);
+        const bottom = pickFromCategory(bottoms);
+        const outer = outers.length > 0 ? pickFromCategory(outers) : null;
+        const shoe = pickFromCategory(shoes);
+        const acc = accessories.length > 0 ? pickFromCategory(accessories) : null;
+        const parts = [];
+        [top, bottom, outer, shoe, acc].forEach(p => {
+          if (p) { let part = p.name; if (p.colors.length > 0) part += ' (' + p.colors.join(', ') + ')'; parts.push(part); }
+        });
+        const text = parts.length > 0 ? parts.join('; ') + '.' : 'Не нашёл подходящих вещей. Отметь больше вещей.';
+
+        // === УТОЧНЁННЫЙ ПРОМПТ ===
+        const genderEn = selectedGender === 'male'
+          ? 'a handsome stylish young man, masculine fit, short neat hair, well-groomed face'
+          : 'a beautiful stylish young woman, elegant feminine fit, long flowing hair, well-groomed face';
+        const genderBody = selectedGender === 'male' ? 'male fashion model' : 'female fashion model';
+
+        const purposeStyle = {
+          'дом': 'cozy relaxed loungewear aesthetic, comfortable loose fit',
+          'учёба': 'smart casual office style, polished and put-together',
+          'прогулка': 'trendy street style outfit, effortless cool urban fashion',
+          'свидание': 'elegant date night outfit, sophisticated stylish look',
+          'спорт': 'athleisure sporty outfit, sleek athletic style, fitted'
+        }[purpose] || 'casual everyday style';
+
+        const w2 = window.currentWeather;
+        const seasonMood = w2.temp < 5
+          ? 'crisp winter atmosphere, soft natural cold daylight, cool tones'
+          : w2.temp < 15
+            ? 'autumn setting, warm golden hour light, cozy mood'
+            : w2.temp < 22
+              ? 'spring fresh atmosphere, soft diffused daylight, mild tones'
+              : 'bright summer day, warm sunlight, vibrant and fresh';
+
+        // Описание одежды — каждоя вещь с уточнением
+        const promptParts = [];
+        if (top) {
+          let desc = ITEM_TRANSLATIONS[top.name];
+          if (top.colors.length > 0) desc += ' in ' + translateColors(top.colors) + ' color';
+          promptParts.push('a ' + desc);
+        }
+        if (bottom) {
+          let desc = ITEM_TRANSLATIONS[bottom.name];
+          if (bottom.colors.length > 0) desc += ' in ' + translateColors(bottom.colors) + ' color';
+          promptParts.push('a ' + desc);
+        }
+        if (outer) {
+          let desc = ITEM_TRANSLATIONS[outer.name];
+          if (outer.colors.length > 0) desc += ' in ' + translateColors(outer.colors) + ' color';
+          promptParts.push('wearing a ' + desc + ' as outer layer over the outfit');
+        }
+        if (shoe) {
+          let desc = ITEM_TRANSLATIONS[shoe.name];
+          if (shoe.colors.length > 0) desc += ' in ' + translateColors(shoe.colors) + ' color';
+          promptParts.push('a pair of ' + desc);
+        }
+        if (acc) {
+          let desc = ITEM_TRANSLATIONS[acc.name];
+          if (acc.colors.length > 0) desc += ' in ' + translateColors(acc.colors) + ' color';
+          promptParts.push('a ' + desc + ' as accessory');
+        }
+
+        // Явное перечисление + запрет подмены
+        const prompt =
+          'Full-body fashion lookbook editorial photo of ' + genderEn + ' (' + genderBody + '). ' +
+          'The person is wearing the following exact clothing items, each must be clearly visible and accurately depicted: ' +
+          promptParts.join('. ') + '. ' +
+          purposeStyle + '. ' + seasonMood + '. ' +
+          'IMPORTANT: each clothing item must exactly match what is described above. ' +
+          'Do not substitute or change any clothing item. ' +
+          'The outer layer must be worn open or partially open to show the layers underneath. ' +
+          'Shot on Hasselblad H6D-100c with 50mm lens, f/2.8, ' +
+          'natural studio lighting, softbox illumination, seamless light grey gradient background, ' +
+          'high-end fashion photography, Vogue magazine editorial style, ' +
+          'photorealistic, ultra-detailed fabric texture, visible stitching and weave, ' +
+          'natural skin texture, realistic hair strands, accurate clothing fit and drape, ' +
+          'full body visible head to toe, confident model pose, ' +
+          'sharp focus, crisp details, no blur, no artifacts, no distortion, ' +
+          'no extra people, no text, no watermark, no logo. ' +
+          '8K UHD, professional color grading, cinematic depth of field --ar 3:4 --style photo --quality 2';
+
+        return { text: text, prompt: prompt };
+      }
+
+      // === УТОЧНЁННЫЕ ПЕРЕВОДЫ — каждая вещь описана точно, чтобы FLUX не путал ===
+      const ITEM_TRANSLATIONS = {
+        'Футболка': 'casual cotton short-sleeve t-shirt (not a polo, not a long sleeve)',
+        'Лонгслив': 'long-sleeve t-shirt with fitted sleeves (not a sweater, not a hoodie)',
+        'Поло': 'collared polo shirt with short sleeves and 2-3 buttons (not a t-shirt, not a dress shirt)',
+        'Топ': 'fitted sleeveless women\'s top with thin straps (not a t-shirt, not a blouse)',
+        'Майка': 'ribbed tank top with thin shoulder straps (not a t-shirt)',
+        'Рубашка': 'button-up collared dress shirt with long sleeves (not a polo, not a t-shirt)',
+        'Блузка': 'elegant women\'s blouse with delicate buttons and feminine neckline (not a t-shirt, not a dress shirt)',
+        'Рубашка с коротким рукавом': 'button-up collared short-sleeve shirt (not a polo, not a long sleeve)',
+        'Свитер': 'knitted wool pullover sweater with long sleeves, no hood, no zipper (not a hoodie, not a cardigan)',
+        'Худи': 'hooded sweatshirt with a kangaroo pocket and drawstring hood (not a sweater, not a jacket)',
+        'Водолазка': 'fitted turtleneck sweater with a high folded collar (not a regular sweater, not a hoodie)',
+        'Свитшот': 'crewneck sweatshirt without a hood, ribbed cuffs and hem (not a hoodie, not a sweater)',
+        'Кардиган': 'open-front knitted cardigan with buttons, worn over a shirt (not a sweater, not a jacket)',
+        'Джемпер': 'fine-knit jumper sweater with a round crew neckline, no hood (not a hoodie, not a cardigan)',
+        'Джинсы': 'classic five-pocket denim jeans with rivets (not chinos, not trousers)',
+        'Чиносы': 'cotton twill chino pants with a slim fit and slant pockets (not jeans, not suit trousers)',
+        'Брюки': 'straight-leg casual trousers with a flat front (not jeans, not chinos)',
+        'Слаксы': 'tailored dress slacks with a crease, formal fit (not jeans, not chinos)',
+        'Шорты': 'short pants ending above the knee (not trousers, not jeans)',
+        'Юбка': 'women\'s skirt reaching to the knee (not a dress, not trousers)',
+        'Платье': 'one-piece women\'s dress covering torso and legs (not a skirt and top, not a blouse)',
+        'Спортивные штаны': 'athletic jogger sweatpants with elastic cuffs at ankles (not jeans, not dress pants)',
+        'Леггинсы': 'tight-fitting stretchy leggings (not jeans, not trousers)',
+        'Джоггеры': 'slim-fit jogger pants with elastic waistband and cuffed ankles (not jeans, not suit pants)',
+        'Куртка': 'casual zip-up jacket with a front zipper, not a blazer, not a suit jacket (not a blazer, not a coat)',
+        'Пальто': 'long wool overcoat extending below the hips, buttoned front (not a jacket, not a blazer)',
+        'Тренч': 'double-breasted trench coat with a belt and storm flap, beige or khaki (not a regular coat, not a jacket)',
+        'Ветровка': 'lightweight nylon windbreaker jacket with a zipper and no lining (not a coat, not a blazer)',
+        'Парка': 'heavy parka jacket with a fur-trimmed hood and quilted lining (not a windbreaker, not a blazer)',
+        'Плащ': 'waterproof raincoat, long, with buttons (not a windbreaker, not a coat)',
+        'Жилетка': 'sleeveless outer vest worn over other layers (not a jacket, not a sweater)',
+        'Пиджак': 'structured formal blazer with lapels and buttons, tailored fit (not a casual jacket, not a coat, not a hoodie)',
+        'Бомбер': 'ribbed-cuff bomber jacket with a zip front and elastic waistband (not a blazer, not a coat)',
+        'Дублёнка': 'sheepskin leather jacket with shearling lining, suede outer (not a blazer, not a windbreaker)',
+        'Кроссовки': 'athletic lace-up sneakers with rubber soles (not dress shoes, not boots)',
+        'Кеды': 'low-top canvas sneakers with rubber toe caps (not athletic sneakers, not boots)',
+        'Ботинки': 'leather ankle boots with laces (not sneakers, not heels)',
+        'Сандалии': 'open strappy sandals exposing the toes (not sneakers, not boots)',
+        'Лоферы': 'slip-on leather loafers without laces, low heel (not sneakers, not boots)',
+        'Туфли': 'women\'s high-heeled pumps with a pointed toe (not flats, not sneakers)',
+        'Сапоги': 'tall knee-high leather boots (not ankle boots, not sneakers)',
+        'Ботильоны': 'women\'s ankle boots with a small block heel (not tall boots, not sneakers)',
+        'Эспадрильи': 'canvas espadrille flats with a jute rope sole (not sneakers, not heels)',
+        'Шапка': 'knitted beanie hat pulled over the ears (not a cap, not a beret)',
+        'Шарф': 'long knitted wool scarf wrapped around the neck (not a snood, not a tie)',
+        'Перчатки': 'winter gloves covering all fingers (not mittens)',
+        'Кепка': 'baseball cap with a brim (not a beanie, not a hat)',
+        'Очки': 'stylish sunglasses with dark lenses (not regular glasses)',
+        'Сумка': 'crossbody leather handbag (not a backpack, not a tote)',
+        'Ремень': 'leather belt worn around the waist over trousers (not a scarf, not a tie)',
+        'Бини': 'fitted beanie hat snug on the head (not a cap, not a beret)',
+        'Снуд': 'circular infinity scarf looped around the neck (not a regular scarf, not a hat)'
+      };
+
+      const COLOR_TRANSLATIONS = {
+        'чёрный':'black','белый':'white','серый':'grey','тёмно-серый':'dark grey',
+        'синий':'blue','голубой':'light blue','тёмно-синий':'navy',
+        'зелёный':'green','хаки':'khaki','оливковый':'olive',
+        'красный':'red','бордовый':'burgundy','оранжевый':'orange',
+        'жёлтый':'yellow','розовый':'pink','коричневый':'brown',
+        'бежевый':'beige','фиолетовый':'purple','сиреневый':'lilac'
+      };
+
+      function translateItem(name) { return ITEM_TRANSLATIONS[name] || name.toLowerCase(); }
+      function translateColors(colors) {
+        if (!colors || colors.length === 0) return 'neutral';
+        return colors.map(c => COLOR_TRANSLATIONS[c] || c).join(' and ');
+      }
+      function capitalizeFirst(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : str; }
+    </script>
+  </body>
+</html>
