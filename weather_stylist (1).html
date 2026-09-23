@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Стилист по погоде</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #f5f5f7;
+  --card: #fff;
+  --accent: #4a90d9;
+  --accent-dark: #357abd;
+  --text: #1a1a1a;
+  --text-secondary: #888;
+  --border: #e0e0e0;
+  --danger: #e74c3c;
+  --radius: 14px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.14);
+  --transition: .22s ease;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text);
+  max-width: 480px; margin: 0 auto; min-height: 100vh;
+  padding-bottom: 72px; position: relative;
+}
+.screen { display: none; padding: 20px 16px; }
+.screen.active { display: block; animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(40px); } to { transform: translateY(0); } }
+
+h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+h2 { font-size: 20px; font-weight: 700; margin: 24px 0 10px; }
+h3 { font-size: 16px; font-weight: 700; margin: 18px 0 8px; }
+p { font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px; }
+.subtitle { font-size: 15px; color: var(--text-secondary); margin-bottom: 24px; }
+
+/* === CHIPS === */
+.chip-row { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px; -webkit-overflow-scrolling: touch; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; padding: 8px 16px; background: var(--card); border: 2px solid var(--border);
+  border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: var(--transition); white-space: nowrap;
+}
+.chip:hover { border-color: var(--accent); }
+.chip.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+/* === OPTION CARDS === */
+.option-group { display: flex; gap: 10px; margin-bottom: 20px; }
+.option-card {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 20px 12px; background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 600;
+  transition: var(--transition);
+}
+.option-card:hover { border-color: var(--accent); }
+.option-card.selected { border-color: var(--accent); background: rgba(74,144,217,0.08); }
+.option-card .emoji { font-size: 32px; }
+
+/* === WARDROBE === */
+.wardrobe-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.wardrobe-item {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  background: var(--card); border: 2px solid var(--border); border-radius: 10px;
+  cursor: pointer; font-size: 14px; transition: var(--transition);
+}
+.wardrobe-item:hover { border-color: var(--accent); }
+.wardrobe-item.selected { border-color: var(--accent); background: rgba(74,144,217,0.08); }
+.wardrobe-item .emoji { font-size: 22px; }
+
+/* === BUTTONS === */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px 20px; border: none; border-radius: var(--radius);
+  font-size: 15px; font-weight: 600; cursor: pointer; transition: var(--transition);
+}
+.btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 8px; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-secondary { background: var(--card); color: var(--text); border: 2px solid var(--border); }
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-icon { background: var(--card); border: 2px solid var(--border); width: 42px; height: 42px; padding: 0; font-size: 18px; }
+.btn-danger { background: var(--card); color: var(--danger); border: 2px solid var(--danger); width: 100%; margin-top: 8px; }
+.btn-danger:hover { background: var(--danger); color: #fff; }
+
+/* === HEADER / WEATHER === */
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.weather-card { text-align: center; padding: 24px 16px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+.weather-temp { font-size: 64px; font-weight: 200; line-height: 1; }
+.weather-status { font-size: 15px; color: var(--text-secondary); margin-top: 6px; }
+.weather-feels { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.weather-error { font-size: 13px; color: var(--danger); margin-top: 8px; }
+
+/* === OUTFIT === */
+.variant-badge { display: inline-block; font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 8px; }
+.outfit-card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
+.outfit-layer { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.outfit-layer:last-child { border-bottom: none; }
+.outfit-layer .emoji { font-size: 28px; }
+.outfit-layer .label { font-size: 14px; font-weight: 600; }
+.outfit-layer .desc { font-size: 13px; color: var(--text-secondary); }
+.outfit-layer .wb-mini { font-size: 11px; color: var(--accent); text-decoration: none; margin-left: 6px; }
+.outfit-layer .wb-mini:hover { text-decoration: underline; }
+.missing-tag { font-size: 11px; color: var(--danger); font-weight: 600; }
+
+/* SKELETON */
+.skeleton { background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-layer { height: 48px; margin: 10px 0; }
+
+/* === FEEDBACK === */
+.feedback-row { display: flex; gap: 8px; margin: 16px 0; }
+.feedback-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px; background: var(--card); border: 2px solid var(--border); border-radius: 12px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-secondary); transition: var(--transition); }
+.feedback-btn:hover { border-color: var(--accent); color: var(--accent); }
+.feedback-btn.voted { border-color: var(--accent); color: var(--accent); background: rgba(74,144,217,0.08); }
+.feedback-btn .emoji { font-size: 22px; }
+
+/* === INFO CARDS === */
+.info-card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 12px; }
+.info-card .item { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.info-card .item:last-child { border-bottom: none; }
+.info-card .item .emoji { font-size: 20px; }
+.info-card .item .badge { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--danger); }
+.info-card .item .badge-new { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--accent); }
+.info-card .item .wb-item-link { margin-left: auto; font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 600; }
+.info-card .item .wb-item-link:hover { text-decoration: underline; }
+.wb-link { display: block; text-align: center; margin-top: 10px; color: var(--accent); font-size: 13px; text-decoration: none; }
+.wb-link:hover { text-decoration: underline; }
+
+/* === SETTINGS === */
+.settings-group { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.settings-row { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.settings-row:last-child { border-bottom: none; }
+.settings-row .label { font-size: 15px; font-weight: 600; }
+.settings-row .value { font-size: 14px; color: var(--text-secondary); }
+.settings-row .value.active { color: var(--accent); font-weight: 600; }
+.settings-row .btn-small { font-size: 13px; padding: 8px 14px; }
+.settings-row.clickable { cursor: pointer; }
+.comfort-card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.comfort-card .label { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.comfort-card .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+/* === BOTTOM NAV === */
+.bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; display: flex; background: var(--card); border-top: 1px solid var(--border); padding: 8px 0; z-index: 100; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; background: none; border: none; cursor: pointer; font-size: 11px; color: var(--text-secondary); transition: var(--transition); }
+.nav-btn .emoji { font-size: 22px; }
+.nav-btn.active { color: var(--accent); }
+
+/* === POPOVER === */
+.popover-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200; justify-content: center; align-items: flex-end; }
+.popover-overlay.show { display: flex; }
+.popover { background: var(--card); width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; padding: 20px 16px; box-shadow: var(--shadow-lg); animation: slideUp .3s ease; }
+.popover h3 { margin-bottom: 12px; }
+.popover .option-card { flex-direction: row; justify-content: center; margin-bottom: 8px; }
+
+/* === TOAST === */
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; z-index: 300; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ========== ОНБОРДИНГ ========== -->
+<div class="screen" id="screen-onboarding">
+  <h1>Стилист по погоде</h1>
+  <p class="subtitle">Подберём образ за 30 секунд. Настроим один раз — потом просто открываешь и получаешь результат.</p>
+
+  <h2>Для кого подбираем?</h2>
+  <div class="option-group" id="gender-group">
+    <div class="option-card" data-value="male"><span class="emoji">👨</span>Мужской</div>
+    <div class="option-card" data-value="female"><span class="emoji">👩</span>Женский</div>
+  </div>
+
+  <h2>Как ты обычно одеваешься?</h2>
+  <div class="option-group" id="warmth-group">
+    <div class="option-card" data-value="cold"><span class="emoji">🥶</span>Легче всех</div>
+    <div class="option-card selected" data-value="normal"><span class="emoji">😐</span>Как все</div>
+    <div class="option-card" data-value="hot"><span class="emoji">🥵</span>Теплее всех</div>
+  </div>
+
+  <h2>Что есть в гардеробе?</h2>
+  <p>Отметь вещи, которые у тебя есть. Цвета не нужны — подберём по стилю.</p>
+  <div class="wardrobe-grid" id="wardrobe-grid"></div>
+
+  <button class="btn btn-primary" id="btn-wardrobe-done" disabled>Готово →</button>
+</div>
+
+<!-- ========== ГЛАВНЫЙ ЭКРАН ========== -->
+<div class="screen" id="screen-main">
+  <div class="header-row">
+    <h1>Сегодня</h1>
+    <button class="btn btn-icon" onclick="showScreen('settings')">⚙️</button>
+  </div>
+
+  <div class="weather-card">
+    <div class="weather-temp" id="weather-temp">—°</div>
+    <div class="weather-status" id="weather-status">Определяю погоду…</div>
+    <div class="weather-feels" id="weather-feels"></div>
+    <div class="weather-error" id="weather-error" style="display:none;"></div>
+  </div>
+
+  <h2>Случай</h2>
+  <div class="chip-row" id="occasion-chips"></div>
+
+  <h2>Рекомендую</h2>
+  <div class="variant-badge" id="variant-badge" style="display:none;"></div>
+  <div class="outfit-card" id="outfit-card">
+    <p>Подбираю образ…</p>
+  </div>
+
+  <button class="btn btn-secondary" style="width:100%" onclick="generateOutfit(true)">🔄 Другой вариант</button>
+
+  <div class="feedback-row" id="feedback-row">
+    <button class="feedback-btn" data-vote="cold"><span class="emoji">🥶</span>Холодно</button>
+    <button class="feedback-btn" data-vote="ok"><span class="emoji">👌</span>Норм</button>
+    <button class="feedback-btn" data-vote="hot"><span class="emoji">🥵</span>Жарко</button>
+  </div>
+
+  <h3>🔍 Gap-анализ гардероба</h3>
+  <div class="info-card" id="gap-card"><p>Чего не хватает для текущей погоды</p></div>
+
+  <h3>🛍️ Идеи для обновления гардероба</h3>
+  <p>Подобрали красивые вещи на Wildberries — даже если всё есть, всегда есть чем разнообразить.</p>
+  <div class="info-card" id="ideas-card"></div>
+  <a class="wb-link" href="https://www.wildberries.ru" target="_blank">Открыть Wildberries →</a>
+</div>
+
+<!-- ========== НАСТРОЙКИ ========== -->
+<div class="screen" id="screen-settings">
+  <div class="header-row">
+    <h1>Настройки</h1>
+    <button class="btn btn-icon" onclick="showScreen('main')">←</button>
+  </div>
+
+  <div class="settings-group">
+    <div class="settings-row clickable" onclick="openPopover('gender')">
+      <span class="label">Пол</span>
+      <span class="value" id="settings-gender">Не выбран</span>
+    </div>
+    <div class="settings-row clickable" onclick="openPopover('warmth')">
+      <span class="label">Теплоощущение</span>
+      <span class="value" id="settings-warmth">Как все</span>
+    </div>
+    <div class="settings-row">
+      <span class="label">Гардерob</span>
+      <span class="value" id="settings-wardrobe-count">0 вещей</span>
+    </div>
+  </div>
+
+  <div class="settings-group">
+    <div class="settings-row">
+      <span class="label">Город</span>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="value" id="settings-city">Москва</span>
+        <button class="btn btn-secondary btn-small" onclick="detectCity()">📍 Авто</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" onclick="showScreen('main')">Сохранить</button>
+
+  <div class="comfort-card">
+    <div class="label">Комфорт-профиль</div>
+    <div class="desc" id="comfort-desc">Ещё недостаточно данных. Отвечайте на вопрос «Холодно / Норм / Жарко» после каждого образа — и рекомендации станут точнее.</div>
+    <div style="margin-top:8px; font-size:13px; color:var(--accent); font-weight:600;" id="comfort-stats"></div>
+  </div>
+
+  <button class="btn btn-danger" onclick="resetAll()">🗑️ Сбросить и начать заново</button>
+</div>
+
+<!-- ========== ПОПОВЕР ========== -->
+<div class="popover-overlay" id="popover-overlay" onclick="closePopover(event)">
+  <div class="popover" id="popover-content"></div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div class="toast" id="toast"></div>
+
+<!-- ========== НИЖНЯЯ НАВИГАЦИЯ ========== -->
+<div class="bottom-nav" id="bottom-nav" style="display:none;">
+  <button class="nav-btn active" data-screen="main" onclick="showScreen('main')"><span class="emoji">👕</span>Образ</button>
+  <button class="nav-btn" data-screen="settings" onclick="showScreen('settings')"><span class="emoji">⚙️</span>Настройки</button>
+</div>
+
+<script>
+// ===== КОНСТАНТЫ =====
+const API_KEY = 'cf529515cd2f060ee5674f0e9b5509b9';
+
+const WARDROBE_ITEMS = [
+  { emoji: "🧥", name: "Пальто", layer: "outer", tags: ["coat"] },
+  { emoji: "🧥", name: "Пуховик", layer: "outer", tags: ["down"] },
+  { emoji: "🧥", name: "Куртка", layer: "outer", tags: ["jacket"] },
+  { emoji: "🧥", name: "Плащ", layer: "outer", tags: ["trench"] },
+  { emoji: "🧣", name: "Шарф", layer: "accessory", tags: ["scarf"] },
+  { emoji: "🧤", name: "Перчатки", layer: "accessory", tags: ["gloves"] },
+  { emoji: "🧢", name: "Шапка", layer: "accessory", tags: ["hat"] },
+  { emoji: "👔", name: "Рубашка", layer: "base", tags: ["shirt"] },
+  { emoji: "👕", name: "Футболка", layer: "base", tags: ["tshirt"] },
+  { emoji: "👕", name: "Лонгслив", layer: "base", tags: ["longsleeve"] },
+  { emoji: "🧶", name: "Свитер", layer: "mid", tags: ["sweater"] },
+  { emoji: "🧥", name: "Кардиган", layer: "mid", tags: ["cardigan"] },
+  { emoji: "🧶", name: "Худи", layer: "mid", tags: ["hoodie"] },
+  { emoji: "👖", name: "Джинсы", layer: "bottom", tags: ["jeans"] },
+  { emoji: "👖", name: "Брюки", layer: "bottom", tags: ["trousers"] },
+  { emoji: "👗", name: "Платье", layer: "bottom", tags: ["dress"] },
+  { emoji: "🩳", name: "Шорты", layer: "bottom", tags: ["shorts"] },
+  { emoji: "👟", name: "Кроссовки", layer: "shoes", tags: ["sneakers"] },
+  { emoji: "🥾", name: "Ботинки", layer: "shoes", tags: ["boots"] },
+  { emoji: "👢", name: "Сапоги", layer: "shoes", tags: ["boots_winter"] },
+  { emoji: "🩴", name: "Сандалии", layer: "shoes", tags: ["sandals"] },
+  { emoji: "🥿", name: "Лоферы", layer: "shoes", tags: ["loafers"] }
+];
+
+// ===== ПРОФИЛИ СЛУЧАЕВ =====
+// Каждый профиль: исключения (теги), приоритеты по слоям (порядок тегов),
+// температурная поправка, модификатор для поиска WB
+const OCCASIONS = {
+  casual: {
+    label: "Повседневное", emoji: "😊",
+    exclusions: [],
+    priorities: {
+      outer: ["down","coat","jacket","trench"],
+      mid: ["sweater","cardigan","hoodie"],
+      base: ["shirt","longsleeve","tshirt"],
+      bottom: ["jeans","trousers","dress","shorts"],
+      shoes: ["sneakers","boots","boots_winter","loafers","sandals"],
+      accessory: ["scarf","gloves","hat"]
+    },
+    tempShift: 0,
+    wbMod: ""
+  },
+  office: {
+    label: "Офис", emoji: "💼",
+    exclusions: ["hoodie","shorts","sandals","tshirt"],
+    priorities: {
+      outer: ["coat","trench","down","jacket"],
+      mid: ["sweater","cardigan"],
+      base: ["shirt","longsleeve"],
+      bottom: ["trousers","jeans","dress"],
+      shoes: ["loafers","boots","boots_winter","sneakers"],
+      accessory: ["scarf","gloves","hat"]
+    },
+    tempShift: 2,
+    wbMod: "деловой"
+  },
+  party: {
+    label: "Вечеринка", emoji: "🎉",
+    exclusions: ["scarf","gloves","hat","down","trench"],
+    priorities: {
+      outer: ["jacket","coat"],
+      mid: ["cardigan","hoodie","sweater"],
+      base: ["shirt","longsleeve","tshirt"],
+      bottom: ["jeans","trousers","dress","shorts"],
+      shoes: ["loafers","sneakers","boots","sandals"],
+      accessory: []
+    },
+    tempShift: -2,
+    wbMod: "нарядный"
+  },
+  sport: {
+    label: "Спорт", emoji: "🏃",
+    exclusions: ["coat","trench","cardigan","loafers","dress","scarf","gloves"],
+    priorities: {
+      outer: ["jacket","down"],
+      mid: ["hoodie","sweater"],
+      base: ["tshirt","longsleeve","shirt"],
+      bottom: ["shorts","jeans","trousers"],
+      shoes: ["sneakers","boots","boots_winter"],
+      accessory: ["hat"]
+    },
+    tempShift: -3,
+    wbMod: "спортивный"
+  },
+  date: {
+    label: "Свидание", emoji: "❤️",
+    exclusions: ["shorts","sandals","hoodie"],
+    priorities: {
+      outer: ["coat","trench","jacket","down"],
+      mid: ["cardigan","sweater"],
+      base: ["shirt","longsleeve","tshirt"],
+      bottom: ["jeans","trousers","dress"],
+      shoes: ["loafers","sneakers","boots","boots_winter"],
+      accessory: ["scarf","hat","gloves"]
+    },
+    tempShift: 0,
+    wbMod: "элегантный"
+  },
+  travel: {
+    label: "Путешествие", emoji: "✈️",
+    exclusions: ["dress"],
+    priorities: {
+      outer: ["jacket","down","coat","trench"],
+      mid: ["hoodie","cardigan","sweater"],
+      base: ["longsleeve","tshirt","shirt"],
+      bottom: ["jeans","trousers","shorts"],
+      shoes: ["sneakers","boots","loafers","boots_winter","sandals"],
+      accessory: ["scarf","hat","gloves"]
+    },
+    tempShift: 0,
+    wbMod: "практичный"
+  }
+};
+
+const WARMTH_SHIFT = { cold: 4, normal: 0, hot: -4 };
+
+// ===== СОСТОЯНИЕ =====
+const STATE = {
+  gender: null,
+  warmth: "normal",
+  wardrobe: new Set(),
+  city: "Москва",
+  lat: null,
+  lon: null,
+  feedback: { cold: 0, ok: 0, hot: 0 },
+  outfitVariant: 0,
+  weather: null,
+  currentOutfit: null,
+  occasion: "casual"
+};
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== ЭКРАНЫ =====
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+  const nav = document.getElementById('bottom-nav');
+  nav.style.display = (name === 'onboarding') ? 'none' : 'flex';
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.screen === name));
+  if (name === 'main') fetchWeather();
+  if (name === 'settings') updateSettings();
+  window.scrollTo(0, 0);
+}
+
+// ===== ОНБОРДИНГ =====
+document.querySelectorAll('#gender-group .option-card').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('#gender-group .option-card').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    STATE.gender = c.dataset.value;
+    checkOnboardingReady();
+  });
+});
+document.querySelectorAll('#warmth-group .option-card').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('#warmth-group .option-card').forEach(x => x.classList.remove('selected'));
+    c.classList.add('selected');
+    STATE.warmth = c.dataset.value;
+    checkOnboardingReady();
+  });
+});
+
+const grid = document.getElementById('wardrobe-grid');
+WARDROBE_ITEMS.forEach((item, i) => {
+  const el = document.createElement('div');
+  el.className = 'wardrobe-item';
+  el.dataset.index = i;
+  el.innerHTML = '<span class="emoji">' + item.emoji + '</span><span>' + item.name + '</span>';
+  el.addEventListener('click', () => {
+    el.classList.toggle('selected');
+    const idx = parseInt(el.dataset.index);
+    if (el.classList.contains('selected')) STATE.wardrobe.add(idx);
+    else STATE.wardrobe.delete(idx);
+    checkOnboardingReady();
+  });
+  grid.appendChild(el);
+});
+
+function checkOnboardingReady() {
+  const btn = document.getElementById('btn-wardrobe-done');
+  btn.disabled = !(STATE.gender && STATE.wardrobe.size > 0);
+}
+document.getElementById('btn-wardrobe-done').addEventListener('click', () => {
+  showScreen('main');
+});
+
+// ===== CHIPS СЛУЧАЕВ =====
+function renderOccasionChips() {
+  const container = document.getElementById('occasion-chips');
+  container.innerHTML = '';
+  Object.entries(OCCASIONS).forEach(([key, occ]) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (STATE.occasion === key ? ' active' : '');
+    chip.textContent = occ.emoji + ' ' + occ.label;
+    chip.addEventListener('click', () => {
+      STATE.occasion = key;
+      STATE.outfitVariant = 0;
+      renderOccasionChips();
+      generateOutfit(false);
+    });
+    container.appendChild(chip);
+  });
+}
+
+// ===== ПОГОДА =====
+let weatherRetryCount = 0;
+
+function fetchWeather() {
+  const tempEl = document.getElementById('weather-temp');
+  const statusEl = document.getElementById('weather-status');
+  const feelsEl = document.getElementById('weather-feels');
+  const errEl = document.getElementById('weather-error');
+
+  tempEl.textContent = '—°';
+  statusEl.textContent = 'Определяю погоду…';
+  feelsEl.textContent = '';
+  errEl.style.display = 'none';
+
+  let url;
+  if (STATE.lat && STATE.lon) {
+    url = 'https://api.openweathermap.org/data/2.5/weather?lat=' + STATE.lat + '&lon=' + STATE.lon + '&appid=' + API_KEY + '&units=metric&lang=ru';
+  } else {
+    url = 'https://api.openweathermap.org/data/2.5/weather?q=' + encodeURIComponent(STATE.city) + '&appid=' + API_KEY + '&units=metric&lang=ru';
+  }
+
+  fetch(url)
+    .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .then(data => {
+      const weather = {
+        temp: Math.round(data.main.temp),
+        status: data.weather[0].description,
+        feels: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        wind: Math.round(data.wind.speed),
+        city: data.name
+      };
+      STATE.weather = weather;
+      weatherRetryCount = 0;
+      tempEl.textContent = weather.temp + '°';
+      statusEl.textContent = weather.status.charAt(0).toUpperCase() + weather.status.slice(1);
+      feelsEl.textContent = 'Ощущается как ' + weather.feels + '° · 💨 ' + weather.wind + ' м/с · 💧 ' + weather.humidity + '%';
+      if (weather.city) {
+        document.getElementById('settings-city').textContent = weather.city;
+        STATE.city = weather.city;
+      }
+      generateOutfit();
+      updateGapAnalysis();
+      updateIdeas();
+    })
+    .catch(err => {
+      const weather = { temp: 12, status: 'Облачно', feels: 10, humidity: 70, wind: 4 };
+      STATE.weather = weather;
+      tempEl.textContent = weather.temp + '°';
+      statusEl.textContent = weather.status;
+      feelsEl.textContent = 'Ощущается как ' + weather.feels + '° · 💨 ' + weather.wind + ' м/с · 💧 ' + weather.humidity + '%';
+      errEl.style.display = 'block';
+      if (weatherRetryCount < 3) {
+        errEl.innerHTML = 'Не удалось получить погоду. <a href="#" onclick="fetchWeather();return false;" style="color:var(--accent);">Попробовать снова</a>';
+        weatherRetryCount++;
+      } else {
+        errEl.textContent = 'Не удалось получить погоду по API — показаны примерные данные.';
+      }
+      generateOutfit();
+      updateGapAnalysis();
+      updateIdeas();
+    });
+}
+
+// ===== ГЕОЛОКАЦИЯ =====
+function detectCity() {
+  const el = document.getElementById('settings-city');
+  el.textContent = 'Определяю…';
+  if (!navigator.geolocation) {
+    el.textContent = 'Москва'; STATE.city = 'Москва'; STATE.lat = null; STATE.lon = null;
+    showToast('Геолокация не поддерживается');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      STATE.lat = pos.coords.latitude.toFixed(4);
+      STATE.lon = pos.coords.longitude.toFixed(4);
+      el.textContent = 'По геолокации';
+      fetchWeather();
+    },
+    () => {
+      el.textContent = 'Москва'; STATE.city = 'Москва'; STATE.lat = null; STATE.lon = null;
+      showToast('Геолокация недоступна — используем Москву');
+    }
+  );
+}
+
+// ===== ЭФФЕКТИВНАЯ ТЕМПЕРАТУРА =====
+function getEffectiveTemp() {
+  const feels = STATE.weather ? STATE.weather.feels : 12;
+  const occ = OCCASIONS[STATE.occasion];
+  return feels + WARMTH_SHIFT[STATE.warmth] + (occ ? occ.tempShift : 0);
+}
+
+// ===== УМНЫЙ PICK С УЧЁТОМ ПРИОРИТЕТОВ И ИСКЛЮЧЕНИЙ =====
+// Возвращает { item, inWardrobe, wbQuery }
+function smartPick(layer, variantIndex, fallbackName, fallbackEmoji) {
+  const occ = OCCASIONS[STATE.occasion];
+  const myItems = [...STATE.wardrobe].map(i => WARDROBE_ITEMS[i]);
+
+  // Фильтруем вещи из гардероба по слою и исключениям
+  const wardrobeInLayer = myItems.filter(w =>
+    w.layer === layer && !occ.exclusions.some(ex => w.tags.includes(ex))
+  );
+
+  // Фильтруем ВСЕ вещи по слою и исключениям (для fallback)
+  const allInLayer = WARDROBE_ITEMS.filter(w =>
+    w.layer === layer && !occ.exclusions.some(ex => w.tags.includes(ex))
+  );
+
+  // Сортируем по приоритету случая
+  const prio = occ.priorities[layer] || [];
+  function sortByPrio(arr) {
+    return arr.slice().sort((a, b) => {
+      const ai = prio.findIndex(t => a.tags.includes(t));
+      const bi = prio.findIndex(t => b.tags.includes(t));
+      const aRank = ai === -1 ? 999 : ai;
+      const bRank = bi === -1 ? 999 : bi;
+      return aRank - bRank;
+    });
+  }
+
+  const sortedWardrobe = sortByPrio(wardrobeInLayer);
+
+  // Если в гардеробе есть вещи — берём по индексу варианта
+  if (sortedWardrobe.length > 0) {
+    const idx = variantIndex % sortedWardrobe.length;
+    const item = sortedWardrobe[idx];
+    return { item, inWardrobe: true, wbQuery: buildWbQuery(item.name) };
+  }
+
+  // Если в гардеробе ничего — берём из приоритетного списка
+  const sortedAll = sortByPrio(allInLayer);
+  if (sortedAll.length > 0) {
+    const idx = variantIndex % sortedAll.length;
+    const item = sortedAll[idx];
+    return { item, inWardrobe: false, wbQuery: buildWbQuery(item.name) };
+  }
+
+  // Совсем ничего — фолбэк
+  return {
+    item: { name: fallbackName, emoji: fallbackEmoji, tags: [] },
+    inWardrobe: false,
+    wbQuery: buildWbQuery(fallbackName)
+  };
+}
+
+function buildWbQuery(itemName) {
+  const occ = OCCASIONS[STATE.occasion];
+  return occ.wbMod ? (itemName + ' ' + occ.wbMod) : itemName;
+}
+
+function wbSearchUrl(query) {
+  return 'https://www.wildberries.ru/catalog/0/search.aspx?search=' + encodeURIComponent(query);
+}
+
+// ===== ОПРЕДЕЛЕНИЕ СЛОЁВ ДЛЯ ТЕКУЩЕЙ ТЕМПЕРАТУРЫ И СЛУЧАЯ =====
+function getLayerStructure(t) {
+  const occ = OCCASIONS[STATE.occasion];
+
+  // Базовая структура слоёв по температуре
+  if (t < -5) {
+    return [
+      { layer: 'outer', label: 'Верх', fallback: 'Пуховик', emoji: '🧥' },
+      { layer: 'mid', label: 'Середина', fallback: 'Свитер', emoji: '🧶' },
+      { layer: 'base', label: 'База', fallback: 'Лонгслив', emoji: '👕' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Джинсы', emoji: '👖' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Сапоги', emoji: '👢' }
+    ].concat(occ.exclusions.includes('scarf') ? [] : [
+      { layer: 'accessory', label: 'Аксессуары', fallback: 'Шарф', emoji: '🧣' }
+    ]);
+  } else if (t < 5) {
+    return [
+      { layer: 'outer', label: 'Верх', fallback: 'Пальто', emoji: '🧥' },
+      { layer: 'mid', label: 'Середина', fallback: 'Свитер', emoji: '🧶' },
+      { layer: 'base', label: 'База', fallback: 'Рубашка', emoji: '👔' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Джинсы', emoji: '👖' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Ботинки', emoji: '🥾' }
+    ].concat(occ.exclusions.includes('scarf') ? [] : [
+      { layer: 'accessory', label: 'Аксессуары', fallback: 'Шарф', emoji: '🧣' }
+    ]);
+  } else if (t < 12) {
+    return [
+      { layer: 'outer', label: 'Верх', fallback: 'Куртка', emoji: '🧥' },
+      { layer: 'mid', label: 'Середина', fallback: 'Худи', emoji: '🧶' },
+      { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Джинсы', emoji: '👖' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+    ];
+  } else if (t < 18) {
+    // Для случая — лёгкий слой вместо outer
+    if (STATE.occasion === 'sport') {
+      return [
+        { layer: 'mid', label: 'Середина', fallback: 'Худи', emoji: '🧶' },
+        { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+        { layer: 'bottom', label: 'Низ', fallback: 'Джинсы', emoji: '👖' },
+        { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+      ];
+    }
+    return [
+      { layer: 'mid', label: 'Слой', fallback: 'Кардиган', emoji: '🧥' },
+      { layer: 'base', label: 'База', fallback: 'Рубашка', emoji: '👔' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Брюки', emoji: '👖' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+    ];
+  } else if (t < 24) {
+    if (STATE.occasion === 'sport') {
+      return [
+        { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+        { layer: 'bottom', label: 'Низ', fallback: 'Шорты', emoji: '🩳' },
+        { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+      ];
+    }
+    return [
+      { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Джинсы', emoji: '👖' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+    ];
+  } else {
+    if (STATE.occasion === 'sport') {
+      return [
+        { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+        { layer: 'bottom', label: 'Низ', fallback: 'Шорты', emoji: '🩳' },
+        { layer: 'shoes', label: 'Обувь', fallback: 'Кроссовки', emoji: '👟' }
+      ];
+    }
+    return [
+      { layer: 'base', label: 'База', fallback: 'Футболка', emoji: '👕' },
+      { layer: 'bottom', label: 'Низ', fallback: 'Шорты', emoji: '🩳' },
+      { layer: 'shoes', label: 'Обувь', fallback: 'Сандалии', emoji: '🩴' }
+    ];
+  }
+}
+
+// ===== КОМБИНАТОРИКА ВАРИАНТОВ =====
+// Каждый слой вращается с разной скоростью:
+// outer — каждый клик, mid — через клик, base — через 2, bottom — через 3, shoes — через 4, accessory — через 5
+const LAYER_CYCLE = {
+  outer: 1, mid: 2, base: 3, bottom: 4, shoes: 5, accessory: 6
+};
+
+// ===== ГЕНЕРАЦИЯ ОБРАЗА =====
+function generateOutfit(isVariant) {
+  if (isVariant) STATE.outfitVariant++;
+  else STATE.outfitVariant = 0;
+
+  const card = document.getElementById('outfit-card');
+  const badge = document.getElementById('variant-badge');
+
+  // Скелетон
+  card.innerHTML = '<div class="skeleton skeleton-layer"></div><div class="skeleton skeleton-layer"></div><div class="skeleton skeleton-layer"></div>';
+
+  setTimeout(() => {
+    const t = getEffectiveTemp();
+    const layerStruct = getLayerStructure(t);
+
+    const layers = layerStruct.map(ls => {
+      const cycle = LAYER_CYCLE[ls.layer] || 1;
+      const vIdx = Math.floor(STATE.outfitVariant / cycle);
+      const pick = smartPick(ls.layer, vIdx, ls.fallback, ls.emoji);
+      return {
+        layerInfo: ls,
+        item: pick.item,
+        inWardrobe: pick.inWardrobe,
+        wbQuery: pick.wbQuery
+      };
+    });
+
+    STATE.currentOutfit = layers;
+
+    let html = '';
+    layers.forEach(l => {
+      const emoji = l.item.emoji || l.layerInfo.emoji;
+      const missing = !l.inWardrobe ? ' <span class="missing-tag">(нет в гардеробе)</span>' : '';
+      const wbLink = ' <a class="wb-mini" href="' + wbSearchUrl(l.wbQuery) + '" target="_blank">Найти →</a>';
+      html += '<div class="outfit-layer">' +
+        '<span class="emoji">' + emoji + '</span>' +
+        '<div><div class="label">' + l.layerInfo.label + '</div>' +
+        '<div class="desc">' + l.item.name + missing + wbLink + '</div></div>' +
+        '</div>';
+    });
+    card.innerHTML = html;
+
+    if (STATE.outfitVariant > 0) {
+      badge.textContent = 'Вариант #' + (STATE.outfitVariant + 1);
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    document.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('voted'));
+    updateIdeas();
+    updateGapAnalysis();
+  }, 500);
+}
+
+// ===== ФИДБЭК =====
+document.querySelectorAll('.feedback-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('voted'));
+    btn.classList.add('voted');
+    const vote = btn.dataset.vote;
+    STATE.feedback[vote]++;
+    updateComfortProfile();
+    showToast('Спасибо! Учту в следующий раз.');
+  });
+});
+
+function updateComfortProfile() {
+  const total = STATE.feedback.cold + STATE.feedback.ok + STATE.feedback.hot;
+  const desc = document.getElementById('comfort-desc');
+  const stats = document.getElementById('comfort-stats');
+  if (total === 0) {
+    desc.textContent = 'Ещё недостаточно данных. Отвечайте на вопрос «Холодно / Норм / Жарко» после каждого образа — и рекомендации станут точнее.';
+    stats.textContent = '';
+  } else {
+    desc.textContent = 'Вы проголосовали ' + total + ' раз. Стало точнее!';
+    stats.textContent = '🥶 ' + STATE.feedback.cold + ' · 👌 ' + STATE.feedback.ok + ' · 🥵 ' + STATE.feedback.hot;
+  }
+}
+
+// ===== GAP-АНАЛИЗ =====
+function updateGapAnalysis() {
+  const card = document.getElementById('gap-card');
+  const t = getEffectiveTemp();
+  const occ = OCCASIONS[STATE.occasion];
+  const myItems = [...STATE.wardrobe].map(i => WARDROBE_ITEMS[i]);
+
+  const needed = [];
+  if (t < -5) {
+    needed.push({ emoji: "🧥", name: "Пуховик", tag: "down" });
+    needed.push({ emoji: "🧶", name: "Свитер", tag: "sweater" });
+    if (!occ.exclusions.includes('scarf')) needed.push({ emoji: "🧣", name: "Шарф", tag: "scarf" });
+    if (!occ.exclusions.includes('gloves')) needed.push({ emoji: "🧤", name: "Перчатки", tag: "gloves" });
+    if (!occ.exclusions.includes('hat')) needed.push({ emoji: "🧢", name: "Шапка", tag: "hat" });
+    needed.push({ emoji: "👢", name: "Сапоги", tag: "boots_winter" });
+  } else if (t < 5) {
+    needed.push({ emoji: "🧥", name: "Пальто или пуховик", tag: "coat" });
+    needed.push({ emoji: "🧶", name: "Свитер или худи", tag: "sweater" });
+    needed.push({ emoji: "🥾", name: "Тёплые ботинки", tag: "boots" });
+  } else if (t < 12) {
+    needed.push({ emoji: "🧥", name: "Куртка", tag: "jacket" });
+    needed.push({ emoji: "🧶", name: "Худи или свитер", tag: "hoodie" });
+  } else if (t < 18) {
+    needed.push({ emoji: "🧥", name: "Кардиган или лёгкий слой", tag: "cardigan" });
+  } else if (t < 24) {
+    needed.push({ emoji: "👕", name: "Лёгкая футболка", tag: "tshirt" });
+  } else {
+    needed.push({ emoji: "🩳", name: "Шорты", tag: "shorts" });
+  }
+
+  // Фильтруем по исключениям случая
+  const validNeeded = needed.filter(n => !occ.exclusions.includes(n.tag));
+  const missing = validNeeded.filter(n => !myItems.some(w => w.tags.includes(n.tag)));
+
+  if (missing.length === 0) {
+    card.innerHTML = '<p style="color:var(--accent);font-weight:600;">✅ Гардероб полностью покрывает текущую погоду и случай!</p>';
+  } else {
+    let html = '';
+    missing.forEach(m => {
+      const q = buildWbQuery(m.name);
+      const url = wbSearchUrl(q);
+      html += '<div class="item"><span class="emoji">' + m.emoji + '</span><span>' + m.name + '</span><a class="wb-item-link" href="' + url + '" target="_blank">Найти →</a></div>';
+    });
+    card.innerHTML = html;
+  }
+}
+
+// ===== ИДЕИ ДЛЯ ОБНОВЛЕНИЯ =====
+function updateIdeas() {
+  const card = document.getElementById('ideas-card');
+  const t = getEffectiveTemp();
+  const occ = OCCASIONS[STATE.occasion];
+  const myItems = [...STATE.wardrobe].map(i => WARDROBE_ITEMS[i]);
+  const variant = STATE.outfitVariant;
+
+  const ideaPools = {
+    veryCold: [
+      [
+        { emoji: "🧥", name: "Парка на пуху", query: "пуховик" },
+        { emoji: "🧶", name: "Объёмный свитер оверсайз", query: "свитер оверсайз" },
+        { emoji: "🧣", name: "Шерстяной шарф-снуд", query: "шарф снуд" }
+      ],
+      [
+        { emoji: "🧥", name: "Дутая куртка", query: "дутая куртка" },
+        { emoji: "🧶", name: "Водолазка под свитер", query: "водолазка" },
+        { emoji: "🧤", name: "Кожаные перчатки на подкладке", query: "перчатки кожаные" }
+      ],
+      [
+        { emoji: "🧥", name: "Стёганая куртка", query: "стеганая куртка" },
+        { emoji: "🧢", name: "Шапка из мериноса", query: "шапка меринос" },
+        { emoji: "👢", name: "Зимние сапоги на меху", query: "сапоги зимние" }
+      ],
+      [
+        { emoji: "🧥", name: "Удлинённый пуховик", query: "пуховик удлиненный" },
+        { emoji: "🧶", name: "Свитер крупной вязки", query: "свитер вязка" },
+        { emoji: "🧣", name: "Плед-шарф", query: "плед шарф" }
+      ]
+    ],
+    cold: [
+      [
+        { emoji: "🧥", name: "Тренч классический", query: "тренч" },
+        { emoji: "🧶", name: "Кашемировый свитер", query: "кашемир свитер" },
+        { emoji: "🥾", name: "Кожаные ботинки челси", query: "ботинки челси" }
+      ],
+      [
+        { emoji: "🧥", name: "Шерстяное пальто", query: "пальто шерстяное" },
+        { emoji: "🧶", name: "Свитер с горлом", query: "свитер с горлом" },
+        { emoji: "🧣", name: "Плед-шарф", query: "плед шарф" }
+      ],
+      [
+        { emoji: "🧥", name: "Парка с подкладкой", query: "парка" },
+        { emoji: "🧶", name: "Толстовка флис", query: "флис толстовка" },
+        { emoji: "🥾", name: "Ботинки на шнуровке", query: "ботинки шнуровка" }
+      ],
+      [
+        { emoji: "🧥", name: "Пальто-кокон", query: "пальто кокон" },
+        { emoji: "🧶", name: "Пуловер с воротником", query: "пуловер воротник" },
+        { emoji: "🧤", name: "Замшевые перчатки", query: "перчатки замша" }
+      ]
+    ],
+    cool: [
+      [
+        { emoji: "🧥", name: "Куртка бомбер", query: "бомбер куртка" },
+        { emoji: "🧶", name: "Худи базовое", query: "худи" },
+        { emoji: "👟", name: "Кроссовки на платформе", query: "кроссовки платформа" }
+      ],
+      [
+        { emoji: "🧥", name: "Джинсовка с подкладкой", query: "джинсовка" },
+        { emoji: "🧶", name: "Свитшот", query: "свитшот" },
+        { emoji: "🥾", name: "Замшевые ботинки", query: "ботинки замша" }
+      ],
+      [
+        { emoji: "🧥", name: "Ветровка-бомбер", query: "ветровка" },
+        { emoji: "🧶", name: "Кардиган крупной вязки", query: "кардиган вязка" },
+        { emoji: "👟", name: "Кеды на танкетке", query: "кеды танкетка" }
+      ],
+      [
+        { emoji: "🧥", name: "Кожаная куртка косуха", query: "косуха" },
+        { emoji: "🧶", name: "Тонкий свитер", query: "свитер тонкий" },
+        { emoji: "👟", name: "Высокие кеды", query: "кеды высокие" }
+      ]
+    ],
+    mild: [
+      [
+        { emoji: "🧥", name: "Кардиган лёгкий", query: "кардиган лёгкий" },
+        { emoji: "👔", name: "Плотная рубашка", query: "рубашка плотная" },
+        { emoji: "👟", name: "Минималистичные кеды", query: "кеды минимализм" }
+      ],
+      [
+        { emoji: "🧶", name: "Тонкий пуловер", query: "пуловер тонкий" },
+        { emoji: "👕", name: "Лонгслив с принтом", query: "лонгслив принт" },
+        { emoji: "🥿", name: "Лоферы замшевые", query: "лоферы замша" }
+      ],
+      [
+        { emoji: "🧥", name: "Деним-жилетка", query: "жилетка" },
+        { emoji: "👕", name: "Базовая футболка", query: "футболка базовая" },
+        { emoji: "👟", name: "Слипоны", query: "слипоны" }
+      ],
+      [
+        { emoji: "🧶", name: "Вязаный жакет", query: "жакет вязка" },
+        { emoji: "👔", name: "Рубашка-оверсайз", query: "рубашка оверсайз" },
+        { emoji: "🥿", name: "Мокасины", query: "мокасины" }
+      ]
+    ],
+    warm: [
+      [
+        { emoji: "👕", name: "Базовая футболка", query: "футболка базовая" },
+        { emoji: "👖", name: "Прямые джинсы", query: "джинсы прямые" },
+        { emoji: "👟", name: "Белые кроссовки", query: "кроссовки белые" }
+      ],
+      [
+        { emoji: "👕", name: "Поло с коротким рукавом", query: "поло" },
+        { emoji: "👖", name: "Лёгкие брюки", query: "брюки лёгкие" },
+        { emoji: "🥿", name: "Лоферы без носков", query: "лоферы" }
+      ],
+      [
+        { emoji: "👕", name: "Футболка оверсайз", query: "футболка оверсайз" },
+        { emoji: "👗", name: "Платье-рубашка", query: "платье рубашка" },
+        { emoji: "👟", name: "Сетка кроссовки", query: "кроссовки сетка" }
+      ],
+      [
+        { emoji: "👕", name: "Льняная рубашка", query: "рубашка лен" },
+        { emoji: "👖", name: "Чиносы", query: "чинос" },
+        { emoji: "👟", name: "Слипоны лёгкие", query: "слипоны легкие" }
+      ]
+    ],
+    hot: [
+      [
+        { emoji: "👕", name: "Льняная футболка", query: "льняная футболка" },
+        { emoji: "🩳", name: "Шорты-карго", query: "шорты карго" },
+        { emoji: "🩴", name: "Лёгкие сандалии", query: "сандалии" }
+      ],
+      [
+        { emoji: "👕", name: "Хлопковая майка", query: "майка хлопок" },
+        { emoji: "🩳", name: "Бермуды", query: "бермуды" },
+        { emoji: "🩴", name: "Сланцы с ремешком", query: "сланцы" }
+      ],
+      [
+        { emoji: "👕", name: "Топ на бретелях", query: "топ бретели" },
+        { emoji: "👗", name: "Лёгкое платье", query: "платье лёгкое" },
+        { emoji: "🩴", name: "Эспадрильи", query: "эспадрильи" }
+      ],
+      [
+        { emoji: "👕", name: "Футболка-поло лён", query: "поло лен" },
+        { emoji: "🩳", name: "Шорты-бермуды", query: "бермуды шорты" },
+        { emoji: "👟", name: "Дышащие кеды", query: "кеды дышащие" }
+      ]
+    ]
+  };
+
+  let pool;
+  if (t < -5) pool = ideaPools.veryCold;
+  else if (t < 5) pool = ideaPools.cold;
+  else if (t < 12) pool = ideaPools.cool;
+  else if (t < 18) pool = ideaPools.mild;
+  else if (t < 24) pool = ideaPools.warm;
+  else pool = ideaPools.hot;
+
+  const ideas = pool[variant % pool.length];
+
+  let html = '';
+  ideas.forEach(idea => {
+    const q = occ.wbMod ? (idea.query + ' ' + occ.wbMod) : idea.query;
+    const url = wbSearchUrl(q);
+    const inWardrobe = myItems.some(w => w.name.toLowerCase().includes(idea.query.split(' ')[0]));
+    const badge = inWardrobe ? '' : '<span class="badge-new">новое</span>';
+    html += '<div class="item"><span class="emoji">' + idea.emoji + '</span><span>' + idea.name + '</span>' + badge + '<a class="wb-item-link" href="' + url + '" target="_blank">Найти →</a></div>';
+  });
+  card.innerHTML = html;
+}
+
+// ===== НАСТРОЙКИ =====
+function updateSettings() {
+  const genderEl = document.getElementById('settings-gender');
+  const warmthEl = document.getElementById('settings-warmth');
+  const wardrobeEl = document.getElementById('settings-wardrobe-count');
+  const cityEl = document.getElementById('settings-city');
+
+  genderEl.textContent = STATE.gender === 'male' ? 'Мужской' : STATE.gender === 'female' ? 'Женский' : 'Не выбран';
+  warmthEl.textContent = STATE.warmth === 'cold' ? 'Легче всех' : STATE.warmth === 'hot' ? 'Теплее всех' : 'Как все';
+  wardrobeEl.textContent = STATE.wardrobe.size + ' вещей';
+  cityEl.textContent = STATE.city;
+  updateComfortProfile();
+}
+
+// ===== ПОПОВЕР =====
+function openPopover(type) {
+  const overlay = document.getElementById('popover-overlay');
+  const content = document.getElementById('popover-content');
+
+  if (type === 'gender') {
+    content.innerHTML = '<h3>Пол</h3>' +
+      '<div class="option-group" style="flex-direction:column;">' +
+      '<div class="option-card ' + (STATE.gender === 'male' ? 'selected' : '') + '" data-value="male"><span class="emoji">👨</span>Мужской</div>' +
+      '<div class="option-card ' + (STATE.gender === 'female' ? 'selected' : '') + '" data-value="female"><span class="emoji">👩</span>Женский</div>' +
+      '</div>';
+    content.querySelectorAll('.option-card').forEach(c => {
+      c.addEventListener('click', () => {
+        STATE.gender = c.dataset.value;
+        closePopover();
+        updateSettings();
+      });
+    });
+  } else if (type === 'warmth') {
+    content.innerHTML = '<h3>Теплоощущение</h3>' +
+      '<div class="option-group" style="flex-direction:column;">' +
+      '<div class="option-card ' + (STATE.warmth === 'cold' ? 'selected' : '') + '" data-value="cold"><span class="emoji">🥶</span>Легче всех</div>' +
+      '<div class="option-card ' + (STATE.warmth === 'normal' ? 'selected' : '') + '" data-value="normal"><span class="emoji">😐</span>Как все</div>' +
+      '<div class="option-card ' + (STATE.warmth === 'hot' ? 'selected' : '') + '" data-value="hot"><span class="emoji">🥵</span>Теплее всех</div>' +
+      '</div>';
+    content.querySelectorAll('.option-card').forEach(c => {
+      c.addEventListener('click', () => {
+        STATE.warmth = c.dataset.value;
+        closePopover();
+        updateSettings();
+        if (STATE.weather) generateOutfit(false);
+      });
+    });
+  }
+  overlay.classList.add('show');
+}
+
+function closePopover(event) {
+  if (event && event.target.id !== 'popover-overlay') return;
+  document.getElementById('popover-overlay').classList.remove('show');
+}
+
+// ===== СБРОС =====
+function resetAll() {
+  if (!confirm('Сбросить все настройки и начать заново?')) return;
+  STATE.gender = null;
+  STATE.warmth = 'normal';
+  STATE.wardrobe.clear();
+  STATE.feedback = { cold: 0, ok: 0, hot: 0 };
+  STATE.outfitVariant = 0;
+  STATE.weather = null;
+  STATE.currentOutfit = null;
+  STATE.occasion = 'casual';
+  document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector('#warmth-group .option-card[data-value="normal"]').classList.add('selected');
+  document.querySelectorAll('.wardrobe-item').forEach(w => w.classList.remove('selected'));
+  renderOccasionChips();
+  showScreen('onboarding');
+}
+
+// ===== СТАРТ =====
+renderOccasionChips();
+showScreen('onboarding');
+</script>
+</body>
+</html>
